@@ -9,3 +9,13 @@ id,title,artist,genre,mood,energy,tempo_bpm,valence,danceability,acousticness
 8,Night Drive Loop,Neon Echo,synthwave,moody,0.75,110,0.49,0.73,0.22
 9,Focus Flow,LoRoom,lofi,focused,0.40,80,0.59,0.60,0.78
 10,Rooftop Lights,Indigo Parade,indie pop,happy,0.76,124,0.81,0.82,0.35
+11,Neon Heartbeat,Astra Nova,edm,euphoric,0.95,136,0.88,0.91,0.04
+12,Dusty Letters,Willow Ash,folk,nostalgic,0.33,84,0.42,0.46,0.87
+13,Iron Pulse,Crimson Vale,metal,aggressive,0.97,172,0.29,0.58,0.02
+14,Moonlit Sonata,Aria Nocturne,classical,melancholic,0.18,68,0.24,0.20,0.95
+15,Velvet Signals,Night Arcade,r&b,romantic,0.54,96,0.73,0.74,0.41
+16,Streetlight Cipher,North Block,hip hop,focused,0.61,92,0.57,0.80,0.23
+17,Cloud Memoir,Soft Static,lofi,nostalgic,0.27,76,0.51,0.55,0.83
+18,Golden Hour Rush,Solar Drift,edm,happy,0.89,142,0.86,0.93,0.06
+19,Winter Balcony,Blue Fern,indie folk,melancholic,0.12,72,0.31,0.39,0.91
+20,City Afterglow,Prism Youth,soul,euphoric,0.72,108,0.82,0.77,0.36
