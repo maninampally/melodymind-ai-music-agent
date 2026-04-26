@@ -133,22 +133,39 @@ Return JSON: {{"picks": [{{"index": int, "confidence": float, "explanation": str
 
     try:
         data = json.loads(response.choices[0].message.content)
-    except json.JSONDecodeError as e:
+        if not isinstance(data, dict):
+            raise ValueError(f"Expected JSON object, got {type(data).__name__}")
+    except (json.JSONDecodeError, ValueError) as e:
         logger.error(f"STEP 4 PARSE ERROR: {e}")
         return []
     recommendations = []
     for pick in data.get("picks", [])[:MAX_RECOMMENDATIONS]:
-        idx = pick["index"] - 1
-        if 0 <= idx < len(candidates):
-            meta = candidates[idx]["metadata"]
+        raw_idx = pick.get("index", 0)
+        if not isinstance(raw_idx, int) or raw_idx < 1:
+            logger.warning(f"STEP 4: skipping invalid index {raw_idx}")
+            continue
+        idx = raw_idx - 1
+        if idx >= len(candidates):
+            logger.warning(f"STEP 4: index {raw_idx} out of range ({len(candidates)} candidates)")
+            continue
+        meta = candidates[idx]["metadata"]
+        required = {"title", "artist", "genre", "mood"}
+        if not required.issubset(meta.keys()):
+            logger.warning(f"STEP 4: candidate missing required metadata fields")
+            continue
+        try:
             recommendations.append(Recommendation(
                 title=meta["title"],
                 artist=meta["artist"],
                 genre=meta["genre"],
                 mood=meta["mood"],
-                confidence=pick["confidence"],
-                explanation=pick["explanation"],
+                confidence=float(pick.get("confidence", 0.5)),
+                explanation=pick.get("explanation", "No explanation provided."),
             ))
+        except Exception as e:
+            logger.warning(f"STEP 4: failed to create recommendation: {e}")
+    if not recommendations:
+        logger.warning("STEP 4: no valid recommendations produced")
     logger.info(f"STEP 4 OUTPUT: {len(recommendations)} final recommendations")
     return recommendations
 
@@ -185,7 +202,7 @@ def run_agent(raw_query: str) -> tuple[bool, str, AgentTrace | None]:
 
     try:
         plan = step_1_plan(validated.query)
-        candidates = step_2_retrieve(validated.query, plan, n=10)
+        candidates = step_2_retrieve(validated.query, plan, n=RETRIEVAL_CANDIDATES)
         rag_context = step_3_rag_context(plan)
         recs = step_4_rerank_and_explain(validated.query, plan, candidates, rag_context)
         recs = step_5_critique(recs)

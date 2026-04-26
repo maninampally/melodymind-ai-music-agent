@@ -16,7 +16,7 @@ def make_songs() -> list[Song]:
     ]
 
 
-# --- OOP Recommender tests ---
+# --- OOP Recommender ---
 
 def test_recommend_returns_correct_count():
     rec = Recommender(make_songs())
@@ -39,6 +39,20 @@ def test_recommend_genre_match_dominates():
     assert results[0].genre == "lofi"
 
 
+def test_recommend_k_larger_than_catalog():
+    rec = Recommender(make_songs())
+    user = UserProfile("pop", "happy", 0.8, False)
+    results = rec.recommend(user, k=100)
+    assert len(results) == 3
+
+
+def test_recommend_with_target_valence():
+    rec = Recommender(make_songs())
+    user = UserProfile("pop", "happy", 0.8, False, target_valence=0.9)
+    results = rec.recommend(user, k=1)
+    assert results[0].genre == "pop"
+
+
 def test_explain_recommendation_non_empty():
     rec = Recommender(make_songs())
     user = UserProfile("pop", "happy", 0.8, False)
@@ -54,7 +68,7 @@ def test_explain_includes_genre_match():
     assert "genre match" in explanation
 
 
-# --- Functional score_song tests ---
+# --- Functional score_song ---
 
 def test_score_song_genre_match_adds_two():
     song = {"genre": "pop", "mood": "happy", "energy": 0.8, "valence": 0.9}
@@ -86,7 +100,21 @@ def test_score_song_with_valence():
     assert any("valence" in r for r in reasons)
 
 
-# --- Functional recommend_songs tests ---
+def test_score_song_missing_target_energy_uses_default():
+    song = {"genre": "pop", "mood": "happy", "energy": 0.5, "valence": 0.5}
+    prefs = {"favorite_genre": "pop", "favorite_mood": "happy"}
+    score, reasons = score_song(prefs, song)
+    assert score >= 0.0
+
+
+def test_score_song_missing_song_fields_uses_default():
+    song = {"genre": "pop", "mood": "happy"}
+    prefs = {"favorite_genre": "pop", "favorite_mood": "happy", "target_energy": 0.5}
+    score, reasons = score_song(prefs, song)
+    assert score >= 0.0
+
+
+# --- Functional recommend_songs ---
 
 def test_recommend_songs_returns_top_k():
     songs = load_songs(SONGS_CSV)
@@ -112,7 +140,14 @@ def test_recommend_songs_result_has_required_keys():
     assert "reasons" in results[0]
 
 
-# --- load_songs tests ---
+def test_recommend_songs_k_larger_than_catalog():
+    songs = load_songs(SONGS_CSV)
+    prefs = {"favorite_genre": "pop", "favorite_mood": "happy", "target_energy": 0.8}
+    results = recommend_songs(prefs, songs, k=1000)
+    assert len(results) == len(songs)
+
+
+# --- load_songs ---
 
 def test_load_songs_returns_20():
     songs = load_songs(SONGS_CSV)
@@ -124,7 +159,7 @@ def test_load_songs_field_types():
     s = songs[0]
     assert isinstance(s["energy"], float)
     assert isinstance(s["valence"], float)
-    assert isinstance(s["tempo_bpm"], int)
+    assert isinstance(s["tempo_bpm"], float)
     assert isinstance(s["title"], str)
 
 
@@ -133,7 +168,7 @@ def test_load_songs_missing_file_raises():
         load_songs("nonexistent/path/songs.csv")
 
 
-# --- Guardrail tests ---
+# --- Guardrail ---
 
 def test_guardrail_accepts_music_query():
     from agent.guardrails import validate_input
@@ -155,13 +190,43 @@ def test_guardrail_rejects_too_short():
     assert ok is False
 
 
+def test_guardrail_accepts_at_min_length():
+    from agent.guardrails import validate_input
+    ok, _, _ = validate_input("edm")
+    assert ok is True
+
+
+def test_guardrail_accepts_at_max_length():
+    from agent.guardrails import validate_input
+    ok, _, _ = validate_input("a" * 300)
+    assert ok is True
+
+
+def test_guardrail_rejects_over_max_length():
+    from agent.guardrails import validate_input
+    ok, _, _ = validate_input("a" * 301)
+    assert ok is False
+
+
 def test_guardrail_no_false_positive_on_diagnostic():
     from agent.guardrails import validate_input
     ok, _, _ = validate_input("diagnostic jazz music for focus")
     assert ok is True
 
 
-def test_guardrail_no_false_positive_on_investment_of_time():
+def test_guardrail_no_false_positive_on_investing():
     from agent.guardrails import validate_input
     ok, _, _ = validate_input("music worth investing time in")
     assert ok is True
+
+
+def test_guardrail_blocks_uppercase_keyword():
+    from agent.guardrails import validate_input
+    ok, _, _ = validate_input("STOCK market music")
+    assert ok is False
+
+
+def test_guardrail_rejects_kill_keyword():
+    from agent.guardrails import validate_input
+    ok, _, _ = validate_input("kill the vibe music")
+    assert ok is False
