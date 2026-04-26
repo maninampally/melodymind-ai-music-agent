@@ -72,4 +72,5 @@ with tab3:
     if trace is None:
         st.info("Run an agent query first to see its full reasoning trace here.")
     else:
+        st.caption(f"Query: **{trace.query}** — {len(trace.recommendations)} recommendations in {trace.duration_seconds}s")
         st.json(trace.model_dump())

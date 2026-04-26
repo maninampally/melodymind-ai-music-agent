@@ -1,3 +1,4 @@
+import re
 from agent.schemas import UserQuery
 from pydantic import ValidationError
 
@@ -16,7 +17,7 @@ def validate_input(raw_query: str) -> tuple[bool, str, UserQuery | None]:
 
     lower_q = validated.query.lower()
     for kw in REFUSED_KEYWORDS:
-        if kw in lower_q:
+        if re.search(rf"\b{re.escape(kw)}\b", lower_q):
             return False, f"Refused: query appears outside the music recommendation scope (matched '{kw}').", None
 
     return True, "OK", validated
