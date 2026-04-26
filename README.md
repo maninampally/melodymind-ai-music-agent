@@ -1,241 +1,209 @@
-# 🎵 Music Recommender Simulation
+# 🎵 MelodyMind: AI Music Recommendation Agent
 
-## Project Summary
-
-In this project you will build and explain a small music recommender system.
-
-Your goal is to:
-
-- Represent songs and a user "taste profile" as data
-- Design a scoring rule that turns that data into recommendations
-- Evaluate what your system gets right and wrong
-- Reflect on how this mirrors real world AI recommenders
-
-This version implements a content-based music recommender in Python. It loads a 20-song catalog from a CSV file, scores each song against a user taste profile using weighted dimensions (genre, mood, energy, valence), and returns the top 5 ranked recommendations with a plain-language explanation of why each song scored the way it did. Five distinct user profiles are tested — from a high-energy pop lover to a conflicted user with contradictory preferences — to evaluate the system's strengths and bias patterns.
+An agentic, LLM-powered music recommendation system that extends a rule-based Module 3 prototype into a full applied AI system. Built for CodePath AI 110 — Project 4: Applied AI System.
 
 ---
 
-## How The System Works
+## Base Project
 
-Real-world platforms like Spotify and TikTok recommend music at scale by combining several kinds of signals. A major part of this is collaborative filtering, which looks at patterns across many users to find tracks that people with similar behavior tend to enjoy, while content signals come from the song itself, such as genre, mood, tempo, and audio characteristics. These systems also depend on implicit feedback like plays, skips, replays, likes, watch time, and completion rate, because those actions reveal preference even when users never explicitly rate a song. The result is a ranking system that learns from both the content of songs and the behavior of large user populations.
+This project extends the **Module 3 Music Recommender Simulation** ([original repo](https://github.com/maninampally/ai110-module3show-musicrecommendersimulation-starter)). The original system was a content-based recommender that scored 20 songs against user taste profiles using weighted dimensions (genre, mood, energy, valence) with hardcoded scoring rules. It tested 5 user profiles and identified bias problems — specifically, that the +2.0 genre weight created a "filter bubble" where genre match dominated all other signals.
 
-This simulator is intentionally simpler and uses a content-based approach only. Instead of learning from user history, it scores each song directly against a user profile using weighted features like genre, mood, energy, tempo, and valence, then recommends the highest-scoring matches. That means the system can work without interaction logs or a trained model, because it compares song attributes to the preferences you provide. It intentionally trades away large-scale personalization, behavioral learning, and real-world complexity in exchange for transparency, simplicity, and easy-to-understand scoring.
-
-To answer the design prompts directly, each `Song` in this simulator uses the columns `genre`, `mood`, `energy`, `tempo_bpm`, and `valence`, while the `UserProfile` stores `favorite_genre`, `favorite_mood`, `target_energy`, and `target_valence`. The `Recommender` computes a score by giving higher points to songs whose genre and mood match the user's preferences and whose numeric features are close to the user's target values, then it sorts all songs by that score and returns the top results. In other words, the recommendation step is just a weighted comparison between the song data in `data/songs.csv` and the user's taste profile.
+This project re-architects that prototype into an agentic LLM system that fixes those bias problems and adds retrieval, reasoning, and self-evaluation layers.
 
 ---
 
-## Getting Started
+## What's New
 
-### Setup
+| Module 3 Baseline | Project 4 (MelodyMind) |
+|---|---|
+| Hardcoded weights (+2.0 genre) | LLM-powered semantic scoring |
+| Rule-based explanations | RAG-grounded natural language explanations |
+| Single scoring step | 6-step agentic workflow with observable trace |
+| No input handling | Pydantic guardrails + scope filtering |
+| 5 hardcoded user profiles | Free-form natural language queries |
+| Manual evaluation | Automated eval harness comparing both systems |
 
-1. Create a virtual environment (optional but recommended):
+---
 
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate      # Mac or Linux
-   .venv\Scripts\activate         # Windows
-   ```
+## Architecture
 
-2. Install dependencies
+![Architecture Diagram](assets/architecture.png)
+
+The system runs a **6-step agentic workflow**:
+
+1. **PLAN** — LLM parses the user's natural language query into a structured `QueryPlan` (intent, mood, genre, energy, keywords)
+2. **RETRIEVE** — ChromaDB vector search returns top 10 candidate songs from the embedded catalog
+3. **RAG CONTEXT** — Custom corpus on genres and moods is retrieved to ground explanations
+4. **RE-RANK + EXPLAIN** — LLM picks the top 5 from candidates and writes explanations grounded in the RAG context
+5. **SELF-CRITIQUE** — Low-confidence picks are flagged
+6. **LOG TRACE** — Full reasoning trace is saved to `/logs` as JSON for observability
+
+A separate **evaluation harness** runs the same 5 user profiles through both the baseline and the agentic system, then compares diversity and bias metrics.
+
+---
+
+## Setup
+
+### Requirements
+
+- Python 3.10+
+- An OpenAI API key with available credits
+
+### Installation
 
 ```bash
+# Clone the repo
+git clone https://github.com/maninampally/melodymind-ai-music-agent.git
+cd melodymind-ai-music-agent
+
+# Create virtual environment
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # macOS/Linux
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-3. Run the app:
+### Configure API Key
+
+Create a `.env` file in the project root:
+
+```
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_EMBED_MODEL=text-embedding-3-small
+```
+
+### Build the Vector Index (one-time)
 
 ```bash
-python -m src.main
+python rag/build_index.py
 ```
 
-### Running Tests
+This embeds all 20 songs and the RAG corpus into a local ChromaDB.
 
-Run the starter tests with:
+---
+
+## Running the System
+
+### CLI
 
 ```bash
-pytest
+python -m agent.cli "I want chill lofi for studying"
 ```
 
-You can add more tests in `tests/test_recommender.py`.
+### Streamlit UI
+
+```bash
+python -m streamlit run app.py
+```
+
+Three tabs:
+- **Agentic Mode** — natural-language input, full LLM pipeline
+- **Baseline Mode** — original Module 3 rule-based recommender
+- **Agent Trace** — full observable reasoning trace of the last query
+
+### Evaluation Harness
+
+```bash
+python -m evals.evaluate
+```
+
+Runs 5 user profiles through both systems and prints a comparison table.
 
 ---
 
-## Terminal Output
+## Sample Interactions
 
-Output from running `python -m src.main` across all 5 user profiles:
+### Example 1: Focused Study Music
 
-```
-$ python -m src.main
+**Input:** `"I want chill lofi for studying"`
 
-Loaded 20 songs from data/songs.csv
+**Output (top result):**
+> #1 Focus Flow — LoRoom (lofi / focused) — Confidence: 0.95
+> *Lofi is designed for focus and study, with mellow beats and minimal lyrics. Focus Flow has a focused mood and low energy (0.3), which matches your need for concentration support.*
 
-============================================================
-TOP 5 RECOMMENDATIONS FOR: HIGH-ENERGY POP LOVER
-============================================================
-#1  Sunrise City — Neon Echo  [pop / happy]
-    Score: 5.37
-    Why: genre match (+2.0), mood match (+1.0), energy proximity (+1.38), valence match (+0.99)
+### Example 2: Conflicting Preferences
 
-#2  Gym Hero — Max Pulse  [pop / intense]
-    Score: 4.38
-    Why: genre match (+2.0), energy proximity (+1.46), valence match (+0.92)
+**Input:** `"high energy but sad and moody"`
 
-#3  Golden Hour Rush — Solar Drift  [edm / happy]
-    Score: 3.47
-    Why: mood match (+1.0), energy proximity (+1.48), valence match (+0.99)
+**Output (top result):**
+> #1 Night Drive Loop — Neon Echo (synthwave / moody) — Confidence: 0.78
+> *Synthwave specializes in moody atmospheres, and this track sits in the high-energy range. The agent prioritized mood match over genre because the user's mood request was more specific than the genre.*
 
-#4  Rooftop Lights — Indigo Parade  [indie pop / happy]
-    Score: 3.25
-    Why: mood match (+1.0), energy proximity (+1.29), valence match (+0.96)
+### Example 3: Refused Out-of-Scope Query
 
-#5  Neon Heartbeat — Astra Nova  [edm / euphoric]
-    Score: 2.40
-    Why: energy proximity (+1.43), valence match (+0.97)
+**Input:** `"give me stock investment tips"`
 
-============================================================
-
-============================================================
-TOP 5 RECOMMENDATIONS FOR: CHILL LOFI STUDENT
-============================================================
-#1  Focus Flow — LoRoom  [lofi / focused]
-    Score: 5.38
-    Why: genre match (+2.0), mood match (+1.0), energy proximity (+1.42), valence match (+0.96)
-
-#2  Library Rain — Paper Lanterns  [lofi / chill]
-    Score: 4.45
-    Why: genre match (+2.0), energy proximity (+1.50), valence match (+0.95)
-
-#3  Midnight Coding — LoRoom  [lofi / chill]
-    Score: 4.38
-    Why: genre match (+2.0), energy proximity (+1.40), valence match (+0.99)
-
-#4  Cloud Memoir — Soft Static  [lofi / nostalgic]
-    Score: 4.34
-    Why: genre match (+2.0), energy proximity (+1.38), valence match (+0.96)
-
-#5  Streetlight Cipher — North Block  [hip hop / focused]
-    Score: 3.09
-    Why: mood match (+1.0), energy proximity (+1.11), valence match (+0.98)
-
-============================================================
-
-============================================================
-TOP 5 RECOMMENDATIONS FOR: DEEP INTENSE ROCK FAN
-============================================================
-#1  Storm Runner — Voltline  [rock / intense]
-    Score: 5.45
-    Why: genre match (+2.0), mood match (+1.0), energy proximity (+1.48), valence match (+0.97)
-
-#2  Gym Hero — Max Pulse  [pop / intense]
-    Score: 3.13
-    Why: mood match (+1.0), energy proximity (+1.46), valence match (+0.68)
-
-#3  Night Drive Loop — Neon Echo  [synthwave / moody]
-    Score: 2.23
-    Why: energy proximity (+1.27), valence match (+0.96)
-
-#4  Iron Pulse — Crimson Vale  [metal / aggressive]
-    Score: 2.23
-    Why: energy proximity (+1.40), valence match (+0.84)
-
-#5  Golden Hour Rush — Solar Drift  [edm / happy]
-    Score: 2.08
-    Why: energy proximity (+1.48), valence match (+0.59)
-
-============================================================
-
-============================================================
-TOP 5 RECOMMENDATIONS FOR: CONFLICTED USER
-============================================================
-#1  Golden Hour Rush — Solar Drift  [edm / happy]
-    Score: 3.97
-    Why: genre match (+2.0), energy proximity (+1.48), valence match (+0.49)
-
-#2  Neon Heartbeat — Astra Nova  [edm / euphoric]
-    Score: 3.89
-    Why: genre match (+2.0), energy proximity (+1.43), valence match (+0.47)
-
-#3  Night Drive Loop — Neon Echo  [synthwave / moody]
-    Score: 3.13
-    Why: mood match (+1.0), energy proximity (+1.27), valence match (+0.86)
-
-#4  Storm Runner — Voltline  [rock / intense]
-    Score: 2.35
-    Why: energy proximity (+1.48), valence match (+0.87)
-
-#5  Iron Pulse — Crimson Vale  [metal / aggressive]
-    Score: 2.33
-    Why: energy proximity (+1.40), valence match (+0.94)
-
-============================================================
-
-============================================================
-TOP 5 RECOMMENDATIONS FOR: EDGE CASE (ALL CENTER)
-============================================================
-#1  Rooftop Lights — Indigo Parade  [indie pop / happy]
-    Score: 4.80
-    Why: genre match (+2.0), mood match (+1.0), energy proximity (+1.11), valence match (+0.69)
-
-#2  Sunrise City — Neon Echo  [pop / happy]
-    Score: 2.68
-    Why: mood match (+1.0), energy proximity (+1.02), valence match (+0.66)
-
-#3  Golden Hour Rush — Solar Drift  [edm / happy]
-    Score: 2.56
-    Why: mood match (+1.0), energy proximity (+0.92), valence match (+0.64)
-
-#4  Midnight Coding — LoRoom  [lofi / chill]
-    Score: 2.32
-    Why: energy proximity (+1.38), valence match (+0.94)
-
-#5  Streetlight Cipher — North Block  [hip hop / focused]
-    Score: 2.27
-    Why: energy proximity (+1.33), valence match (+0.93)
-
-============================================================
-```
+**Output:**
+> Refused: query appears outside the music recommendation scope (matched 'stock').
 
 ---
 
-## Experiments You Tried
+## Design Decisions
 
-**Experiment 1 — Five Distinct User Profiles**
-
-I ran five different profiles through the recommender: High-Energy Pop Lover, Chill Lofi Student, Deep Intense Rock Fan, Conflicted User (high energy + sad mood), and an Edge Case with all numeric preferences at 0.5. Each returned very different top-5 lists, confirming the scoring dimensions are meaningfully differentiated.
-
-**Experiment 2 — Genre Dominance Observation**
-
-The genre weight of +2.0 consistently dominated rankings. For the Rock Fan profile, Storm Runner scored 5.45 (genre + mood + energy all aligned). The second-place song was Gym Hero at 3.13 — a gap of over 2 points — simply because there is only one rock song in the catalog. Genre match is the single largest score differentiator.
-
-**Experiment 3 — Conflicted User (energy=0.9, mood=moody)**
-
-A user who wants high-energy but sad/moody music got EDM songs at the top because the genre match dominated, even though the mood (moody) didn't match EDM's typical vibe. This revealed the algorithm cannot resolve contradictions — it just scores each dimension independently and sums them.
-
-**Experiment 4 — Edge Case (all numerics at 0.5)**
-
-With every numeric preference at the midpoint, the system still confidently ranked Rooftop Lights #1 (score 4.80) purely because it matched the genre ("indie pop") and mood ("happy"). This shows genre bias is structural: even with no strong numeric preferences, genre match alone is worth more than perfect energy + valence alignment from a different genre.
+- **Why ChromaDB over Pinecone or Weaviate?** Local persistence, zero infrastructure setup, sufficient performance for 20 songs.
+- **Why GPT-4o-mini?** Best cost/quality tradeoff for a structured-output workflow with multiple LLM calls per query.
+- **Why temperature=0?** Deterministic output is essential for both demos and evaluation comparisons.
+- **Why a 6-step agent instead of a single LLM call?** Each step is independently observable, testable, and replaceable. The trace makes the agent's reasoning auditable.
+- **Why keep the baseline?** Direct comparison proves the agentic system measurably improves over the rule-based version.
 
 ---
 
-## Limitations and Risks
+## Testing Summary
 
-- **Tiny catalog (20 songs):** Underrepresented genres like rock, metal, classical, and folk have only one song each, so users with those preferences see the genre match once and then fall through to generic energy/valence ranking.
-- **No learning or feedback:** The system gives the exact same top-5 every time for the same profile. There is no randomness, no exploration, and no way to say "I didn't like that song."
-- **Genre creates a filter bubble:** The +2.0 genre weight means a genre match outweighs even perfect energy and valence alignment from a different genre, trapping users inside their stated preference.
-- **Cannot resolve conflicting preferences:** A user who wants high energy but a sad mood will get high-energy songs regardless, because energy and mood are scored independently with no cross-feature logic.
-- **No lyric, language, or cultural context:** Two songs can have identical energy and valence but feel completely different based on language, instrumentation, or cultural origin — features the system ignores entirely.
-
-See `model_card.md` for a deeper analysis.
+- **Eval harness:** 5 of 5 test profiles pass end-to-end
+- **Diversity improvement:** the agentic system returns more diverse genres than the baseline for 4 of 5 profiles, addressing the genre filter bubble identified in Module 3
+- **Guardrails:** input validation correctly refuses out-of-scope queries
+- **Confidence scoring:** agent flags low-confidence recommendations (<0.5) with a warning in the explanation
 
 ---
 
 ## Reflection
 
-Read and complete `model_card.md`:
+See [`model_card.md`](model_card.md) for the full reflection on AI collaboration, biases, limitations, and lessons learned.
 
-[**Model Card**](model_card.md)
+---
 
-Building this recommender made it clear how quickly simple math creates the "feeling" of intelligence. Assigning a +2.0 for a genre match and a proximity formula for energy produced results that genuinely surprised me — they felt like real recommendations, not just arithmetic. But that feeling is an illusion: the system is fully deterministic, has no memory of what worked, and cannot discover anything outside the user's stated preferences. The gap between "feels smart" and "is smart" turned out to be very small to produce, and very large to close.
+## Demo Walkthrough
 
-The most important lesson about bias came from watching genre dominate every single ranking. I expected energy and valence to matter more, but a 2-point genre bonus consistently outweighed a 1.5-point maximum energy score plus a 1.0-point valence score combined. Real platforms spend enormous engineering effort fighting this kind of categorical lock-in — diversity penalties, exploration boosts, serendipity mechanics — because left alone, any scoring system concentrates results around whatever dimension has the heaviest weight.
+📺 **Loom video:** [PASTE YOUR LOOM LINK HERE]
+
+The walkthrough demonstrates:
+- End-to-end CLI run with 3 example queries
+- Streamlit UI showing all three tabs
+- Agent trace with all 6 steps observable
+- Evaluation harness comparing baseline vs agentic system
+- Guardrail behavior on a refused query
+
+---
+
+## Project Structure
+
+```
+melodymind-ai-music-agent/
+├── agent/
+│   ├── orchestrator.py    # 6-step agentic workflow
+│   ├── schemas.py         # Pydantic models
+│   ├── guardrails.py      # Input validation + scope filter
+│   └── cli.py             # Command-line interface
+├── rag/
+│   ├── build_index.py     # Embed songs + corpus into ChromaDB
+│   └── corpus/
+│       ├── genres.md      # Custom genre knowledge
+│       └── moods.md       # Custom mood vocabulary
+├── evals/
+│   └── evaluate.py        # Baseline vs agentic comparison
+├── src/                   # Original Module 3 code
+├── data/songs.csv         # 20-song catalog
+├── tests/                 # Original Module 3 tests
+├── assets/
+│   └── architecture.png   # System diagram
+├── logs/                  # Agent traces (JSON)
+├── chroma_db/             # Vector store (local)
+├── app.py                 # Streamlit UI
+├── README.md
+├── model_card.md
+└── requirements.txt
+```
