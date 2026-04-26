@@ -28,6 +28,7 @@ class UserProfile:
     favorite_mood: str
     target_energy: float
     likes_acoustic: bool
+    target_valence: Optional[float] = None
 
 class Recommender:
     """
@@ -50,9 +51,11 @@ class Recommender:
                 score += song.acousticness
             else:
                 score += (1 - song.acousticness)
+            if user.target_valence is not None:
+                score += 1.0 * (1 - abs(song.valence - user.target_valence))
             return score
 
-        return sorted(self.songs, key=song_score, reverse=True)[:k]
+        return sorted(self.songs, key=song_score, reverse=True)[:min(k, len(self.songs))]
 
     def explain_recommendation(self, user: UserProfile, song: Song) -> str:
         """Return a human-readable explanation of why a song was recommended."""
@@ -80,15 +83,17 @@ def load_songs(csv_path: str) -> List[Dict]:
         with open(csv_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                # Convert numerical fields to appropriate types
-                row['id'] = int(row['id'])
-                row['energy'] = float(row['energy'])
-                row['tempo_bpm'] = int(row['tempo_bpm'])
-                row['valence'] = float(row['valence'])
-                row['danceability'] = float(row['danceability'])
-                row['acousticness'] = float(row['acousticness'])
-                
-                # Leave string fields as-is: title, artist, genre, mood
+                try:
+                    row['id'] = int(row['id'])
+                    row['energy'] = float(row['energy'])
+                    row['tempo_bpm'] = float(row['tempo_bpm'])
+                    row['valence'] = float(row['valence'])
+                    row['danceability'] = float(row['danceability'])
+                    row['acousticness'] = float(row['acousticness'])
+                except (ValueError, TypeError) as e:
+                    import logging
+                    logging.getLogger(__name__).warning(f"Skipping malformed row {row.get('id', '?')}: {e}")
+                    continue
                 songs.append(row)
     except FileNotFoundError as e:
         raise FileNotFoundError(f"Cannot read CSV file at {csv_path}: {e}")
@@ -99,28 +104,36 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     """Score a song against user preferences and return (total_score, reasons list)."""
     total_score = 0.0
     reasons = []
-    
+
     # Genre match: +2.0
-    if song['genre'] == user_prefs['favorite_genre']:
+    if song.get('genre') == user_prefs.get('favorite_genre'):
         total_score += 2.0
         reasons.append("genre match (+2.0)")
-    
+
     # Mood match: +1.0
-    if song['mood'] == user_prefs['favorite_mood']:
+    if song.get('mood') == user_prefs.get('favorite_mood'):
         total_score += 1.0
         reasons.append("mood match (+1.0)")
-    
+
     # Energy similarity: 1.5 * (1 - abs difference)
-    energy_score = 1.5 * (1 - abs(song['energy'] - user_prefs['target_energy']))
+    target_energy = user_prefs.get('target_energy', 0.5)
+    energy_score = 1.5 * (1 - abs(float(song.get('energy', 0.5)) - target_energy))
     total_score += energy_score
     reasons.append(f"energy proximity (+{energy_score:.2f})")
-    
+
     # Valence similarity (if target_valence exists)
     if 'target_valence' in user_prefs:
-        valence_score = 1.0 * (1 - abs(song['valence'] - user_prefs['target_valence']))
+        valence_score = 1.0 * (1 - abs(float(song.get('valence', 0.5)) - user_prefs['target_valence']))
         total_score += valence_score
         reasons.append(f"valence match (+{valence_score:.2f})")
-    
+
+    # Acousticness fit (if likes_acoustic exists)
+    if 'likes_acoustic' in user_prefs:
+        acoustic_val = float(song.get('acousticness', 0.5))
+        acoustic_score = acoustic_val if user_prefs['likes_acoustic'] else (1 - acoustic_val)
+        total_score += acoustic_score
+        reasons.append(f"acousticness fit (+{acoustic_score:.2f})")
+
     return (round(total_score, 2), reasons)
 
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Dict]:
