@@ -13,3 +13,12 @@ venv/
 
 # Pytest cache
 .pytest_cache/
+
+.env
+.venv/
+logs/
+chroma_db/
+__pycache__/
+*.pyc
+
+BUILD_GUIDE.md
