@@ -1,10 +1,10 @@
 """MelodyMind Streamlit UI: baseline vs agentic music recommender."""
 import streamlit as st
-from pathlib import Path
 from src.recommender import recommend_songs, load_songs
 from agent.orchestrator import run_agent
+from config import SONGS_CSV
 
-DATA_PATH = str(Path(__file__).parent / "data" / "songs.csv")
+DATA_PATH = str(SONGS_CSV)
 
 st.set_page_config(page_title="MelodyMind", page_icon="🎵", layout="wide")
 

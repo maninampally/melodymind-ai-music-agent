@@ -1,27 +1,19 @@
-import os
 import json
 import time
 import logging
 from pathlib import Path
 from datetime import datetime
-from dotenv import load_dotenv
 from openai import OpenAI
 import chromadb
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 
 from agent.schemas import UserQuery, QueryPlan, Recommendation, AgentTrace
 from agent.guardrails import validate_input
-
-load_dotenv()
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-EMBED_MODEL = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
-
-ROOT = Path(__file__).parent.parent
-DB_DIR = ROOT / "chroma_db"
-LOGS_DIR = ROOT / "logs"
-LOGS_DIR.mkdir(exist_ok=True)
+from config import (
+    OPENAI_API_KEY, OPENAI_MODEL as MODEL, OPENAI_EMBED_MODEL as EMBED_MODEL,
+    DB_DIR, LOGS_DIR, RETRIEVAL_CANDIDATES, RAG_CONTEXT_PER_QUERY,
+    MAX_RECOMMENDATIONS, LOW_CONFIDENCE_THRESHOLD,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,7 +52,7 @@ def step_1_plan(query: str) -> QueryPlan:
     return plan
 
 
-def step_2_retrieve(query: str, plan: QueryPlan, n: int = 10) -> list[dict]:
+def step_2_retrieve(query: str, plan: QueryPlan, n: int = RETRIEVAL_CANDIDATES) -> list[dict]:
     logger.info(f"STEP 2 RETRIEVE: searching for top {n} candidates")
     collection = chroma_client.get_collection("songs", embedding_function=embed_fn)
     search_text = f"{query}. Genre: {plan.desired_genre}. Mood: {plan.desired_mood}."
@@ -90,7 +82,7 @@ def step_3_rag_context(plan: QueryPlan) -> list[str]:
 
     context_chunks = []
     for q in queries:
-        results = collection.query(query_texts=[q], n_results=2)
+        results = collection.query(query_texts=[q], n_results=RAG_CONTEXT_PER_QUERY)
         for doc in results["documents"][0]:
             if doc not in context_chunks:
                 context_chunks.append(doc)
@@ -145,7 +137,7 @@ Return JSON: {{"picks": [{{"index": int, "confidence": float, "explanation": str
         logger.error(f"STEP 4 PARSE ERROR: {e}")
         return []
     recommendations = []
-    for pick in data.get("picks", [])[:5]:
+    for pick in data.get("picks", [])[:MAX_RECOMMENDATIONS]:
         idx = pick["index"] - 1
         if 0 <= idx < len(candidates):
             meta = candidates[idx]["metadata"]
@@ -165,7 +157,7 @@ def step_5_critique(recommendations: list[Recommendation]) -> list[Recommendatio
     logger.info("STEP 5 CRITIQUE: reviewing confidence scores")
     result = []
     for rec in recommendations:
-        if rec.confidence < 0.5:
+        if rec.confidence < LOW_CONFIDENCE_THRESHOLD:
             result.append(rec.model_copy(update={
                 "explanation": rec.explanation + " [Low confidence: may not be a strong match.]"
             }))

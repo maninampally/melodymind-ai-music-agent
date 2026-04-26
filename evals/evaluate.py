@@ -8,11 +8,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.recommender import recommend_songs, load_songs
 from agent.orchestrator import run_agent
+from config import SONGS_CSV
 
 console = Console()
 
-ROOT = Path(__file__).parent.parent
-SONGS_CSV = str(ROOT / "data" / "songs.csv")
+SONGS_CSV = str(SONGS_CSV)
 
 TEST_CASES = [
     {

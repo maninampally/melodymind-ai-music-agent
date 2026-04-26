@@ -1,30 +1,12 @@
-"""Build vector indices for songs and the RAG corpus.
-
-This script reads songs from data/songs.csv and the custom corpus
-from rag/corpus/, embeds them with OpenAI, and stores them in ChromaDB.
-"""
-import os
 import csv
 import sys
-from pathlib import Path
-from dotenv import load_dotenv
 import chromadb
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
-
-load_dotenv()
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-EMBED_MODEL = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
+from config import OPENAI_API_KEY, OPENAI_EMBED_MODEL as EMBED_MODEL, SONGS_CSV, CORPUS_DIR, DB_DIR
 
 if not OPENAI_API_KEY:
     print("ERROR: OPENAI_API_KEY not found in .env file")
     sys.exit(1)
-
-# Paths
-ROOT = Path(__file__).parent.parent
-SONGS_CSV = ROOT / "data" / "songs.csv"
-CORPUS_DIR = ROOT / "rag" / "corpus"
-DB_DIR = ROOT / "chroma_db"
 
 
 def song_to_text(row: dict) -> str:
