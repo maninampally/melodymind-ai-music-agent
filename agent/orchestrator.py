@@ -50,8 +50,12 @@ def step_1_plan(query: str) -> QueryPlan:
             {"role": "user", "content": query},
         ],
     )
-    data = json.loads(response.choices[0].message.content)
-    plan = QueryPlan(**data)
+    try:
+        data = json.loads(response.choices[0].message.content)
+        plan = QueryPlan(**data)
+    except (json.JSONDecodeError, Exception) as e:
+        logger.error(f"STEP 1 PARSE ERROR: {e}")
+        plan = QueryPlan(intent=query, keywords=[])
     logger.info(f"STEP 1 OUTPUT: {plan.model_dump()}")
     return plan
 
@@ -135,7 +139,11 @@ Return JSON: {{"picks": [{{"index": int, "confidence": float, "explanation": str
         ],
     )
 
-    data = json.loads(response.choices[0].message.content)
+    try:
+        data = json.loads(response.choices[0].message.content)
+    except json.JSONDecodeError as e:
+        logger.error(f"STEP 4 PARSE ERROR: {e}")
+        return []
     recommendations = []
     for pick in data.get("picks", [])[:5]:
         idx = pick["index"] - 1
@@ -155,10 +163,15 @@ Return JSON: {{"picks": [{{"index": int, "confidence": float, "explanation": str
 
 def step_5_critique(recommendations: list[Recommendation]) -> list[Recommendation]:
     logger.info("STEP 5 CRITIQUE: reviewing confidence scores")
+    result = []
     for rec in recommendations:
         if rec.confidence < 0.5:
-            rec.explanation += " [Low confidence: may not be a strong match.]"
-    return recommendations
+            result.append(rec.model_copy(update={
+                "explanation": rec.explanation + " [Low confidence: may not be a strong match.]"
+            }))
+        else:
+            result.append(rec)
+    return result
 
 
 def step_6_log_trace(trace: AgentTrace) -> Path:
