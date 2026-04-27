@@ -168,7 +168,7 @@ See [`model_card.md`](model_card.md) for the full reflection on AI collaboration
 
 ## Demo Walkthrough
 
-📺 **Loom video:** [PASTE YOUR LOOM LINK HERE]
+📺 **Loom video:** [Watch Demo](https://www.loom.com/share/1c2b2d221552456994a9b9e7cd46fe7c)
 
 The walkthrough demonstrates:
 - End-to-end CLI run with 3 example queries
@@ -207,3 +207,7 @@ melodymind-ai-music-agent/
 ├── model_card.md
 └── requirements.txt
 ```
+
+---
+
+Built by **Manikanth**
